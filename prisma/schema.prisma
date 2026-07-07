@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Member {
+  id           String        @id @default(cuid())
+  name         String
+  title        String
+  email        String        @unique
+  color        String        @default("#3b82f6")
+  createdAt    DateTime      @default(now())
+  tasks        Task[]        @relation("TaskAssignee")
+  timeLogs     TimeLog[]
+  deliverables Deliverable[] @relation("DeliverableOwner")
+  reviews      Deliverable[] @relation("DeliverableReviewer")
+  risks        Risk[]
+  interviews   Interview[]
+}
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#3b82f6")
+  order     Int      @default(0)
+  collapsed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  tasks     Task[]
+}
+
+model Task {
+  id             String           @id @default(cuid())
+  name           String
+  status         String           @default("Not Started")
+  priority       String           @default("Medium")
+  assigneeId     String?
+  assignee       Member?          @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  groupId        String
+  group          Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  startDate      DateTime?
+  dueDate        DateTime?
+  estimatedHours Float            @default(0)
+  notes          String?
+  order          Int              @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  timeLogs       TimeLog[]
+  predecessors   TaskDependency[] @relation("SuccessorTask")
+  successors     TaskDependency[] @relation("PredecessorTask")
+}
+
+model TaskDependency {
+  id              String @id @default(cuid())
+  predecessorId   String
+  successorId     String
+  predecessor     Task   @relation("PredecessorTask", fields: [predecessorId], references: [id], onDelete: Cascade)
+  successor       Task   @relation("SuccessorTask", fields: [successorId], references: [id], onDelete: Cascade)
+
+  @@unique([predecessorId, successorId])
+}
+
+model TimeLog {
+  id          String   @id @default(cuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [id])
+  hours       Float
+  date        DateTime @default(now())
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+model Stakeholder {
+  id             String      @id @default(cuid())
+  organization   String
+  type           String      @default("Housing Authority")
+  contactName    String?
+  title          String?
+  email          String?
+  phone          String?
+  territory      String?
+  outreachStatus String      @default("Not Contacted")
+  interviewStatus String     @default("Not Scheduled")
+  consentObtained Boolean    @default(false)
+  notes          String?
+  createdAt      DateTime    @default(now())
+  interviews     Interview[]
+}
+
+model Interview {
+  id               String      @id @default(cuid())
+  stakeholderId    String
+  stakeholder      Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+  interviewerId    String
+  interviewer      Member      @relation(fields: [interviewerId], references: [id])
+  scheduledDate    DateTime?
+  completedDate    DateTime?
+  durationMinutes  Int?
+  keyThemes        String[]
+  barriersFound    String[]
+  notes            String?
+  followUpNeeded   Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+}
+
+model Barrier {
+  id           String   @id @default(cuid())
+  name         String
+  category     String   @default("Financial")
+  description  String?
+  frequency    Int      @default(5)
+  severity     Int      @default(5)
+  stakeholders String[]
+  createdAt    DateTime @default(now())
+}
+
+model Deliverable {
+  id               String   @id @default(cuid())
+  name             String
+  type             String   @default("Report")
+  status           String   @default("Not Started")
+  completionPct    Int      @default(0)
+  ownerId          String?
+  owner            Member?  @relation("DeliverableOwner", fields: [ownerId], references: [id])
+  reviewerId       String?
+  reviewer         Member?  @relation("DeliverableReviewer", fields: [reviewerId], references: [id])
+  dueDate          DateTime?
+  reviewerComments String?
+  createdAt        DateTime @default(now())
+}
+
+model Risk {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  probability    String   @default("Medium")
+  impact         String   @default("Medium")
+  status         String   @default("Open")
+  mitigationPlan String?
+  ownerId        String?
+  owner          Member?  @relation(fields: [ownerId], references: [id])
+  createdAt      DateTime @default(now())
+}
+
+model ProgressSnapshot {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  plannedPct  Float
+  actualPct   Float
+  tasksPct    Float
+  interviewsPct Float
+  deliverablesPct Float
+  riskPenalty Float
+}
